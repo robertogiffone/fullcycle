@@ -1,0 +1,58 @@
+services:
+
+  nginxnode:
+    build: 
+      context: ./nginx
+    container_name: nginxnode
+    restart: always
+    tty: true
+    ports:
+      - "8080:80"
+    networks:
+      - node-network
+    depends_on:
+      - appnode
+
+  appnode:
+    build: 
+      context: node
+    container_name: appnode
+    networks:
+      - node-network
+    volumes:
+      - ./node:/usr/src/app
+    tty: true
+    entrypoint: sh -c "npm install && node index.js"
+    environment:
+      - DATABASE_HOST=mysqlnode
+      - DATABASE_USER=root
+      - DATABASE_PASSWORD=root
+      - DATABASE_NAME=node
+    depends_on:
+      mysqlnode:
+        condition: service_healthy
+
+  mysqlnode:
+    image: mysql:5.7
+    command: --innodb-use-native-aio=0
+    container_name: mysqlnode
+    restart: always
+    tty: true
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: node
+    networks:
+      - node-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  node-network:
+    driver: bridge
